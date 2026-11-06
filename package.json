@@ -1,8 +1,8 @@
 {
   "name": "friends-agro",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "আপনার_ফাইলের_নাম.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node আপনার_ফাইলের_নাম.js"
   }
 }
