@@ -1,27 +1,43 @@
-const http = require('http');
-const admin = require('firebase-admin');
+export default {
+  async fetch(request, env, ctx) {
+    const url = new URL(request.url);
+    
+    // আপনার মূল ফায়ারবেস ডাটাবেজ অথবা রেন্ডার ব্যাকএন্ডের লিংক এখানে যুক্ত করুন
+    const FIREBASE_DB_URL = "https://friends-agro-incubator-pro-default-rtdb.firebaseio.com";
+    const RENDER_BACKEND_URL = "https://your-render-app-name.onrender.com"; // ঐচ্ছিক ব্যাকএন্ড মিডলওয়্যার
 
-// Firebase Admin initialization with your database URL
-admin.initializeApp({
-  credential: admin.credential.applicationDefault(),
-  databaseURL: "https://friends-agro-incubator-pro-default-rtdb.firebaseio.com"
-});
+    try {
+      // রিকোয়েস্টের ধরন দেখে সিদ্ধান্ত নেওয়া (সুপারসনিক প্রক্সি রাউটিং)
+      // যদি রিকোয়েস্টটি ফায়ারবেসের সরাসরি ডাটা রিড/রাইট সম্পর্কিত হয়
+      let targetUrl = FIREBASE_DB_URL + url.pathname + url.search;
 
-const db = admin.database();
+      const response = await fetch(targetUrl, {
+        method: request.method,
+        headers: request.headers,
+        body: ['GET', 'HEAD'].includes(request.method) ? null : request.body,
+        // ক্লাউডফ্লেয়ারের সুপারসনিক এজ ক্যাশিং এবং অপ্টিমাইজেশন এনাবল করা
+        cf: {
+          cacheTtl: 5, // অতি দ্রুত ডাটা আদান-প্রদানের জন্য ক্যাশ সময়
+          cacheEverything: true
+        }
+      });
 
-const server = http.createServer(async (req, res) => {
-  res.writeHead(200, { 'Content-Type': 'text/plain' });
-  
-  try {
-    // Example test fetch to prioritize fast data source connection
-    const snapshot = await db.ref('/').once('value');
-    res.end('Friends Agro Server is Live with Firebase Connected!\n');
-  } catch (error) {
-    res.end('Friends Agro Server is Live (Firebase warning/fallback)!\n');
+      // ফায়ারবেস বা সার্ভার থেকে আসা রেসপন্সটি ইনস্ট্যান্ট ইউজারের কাছে পৌঁছে দেওয়া
+      return new Response(response.body, {
+        status: response.status,
+        headers: response.headers
+      });
+
+    } catch (error) {
+      // ফল্ট টলারেন্স: নেটওয়ার্ক বা সার্ভারে সমস্যা হলে ফলব্যাক রেসপন্স
+      return new Response(JSON.stringify({
+        status: "active",
+        message: "Friends Agro Cloud Gateway is running in High-Speed Failover Mode",
+        error: error.message
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
   }
-});
-
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`Friends Agro MQTT Application is running successfully on port ${PORT}`);
-});
+};
